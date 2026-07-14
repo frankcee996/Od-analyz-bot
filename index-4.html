@@ -1,0 +1,2219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FOREX TERMINAL // ANALYSIS SYSTEM</title>
+<style>
+/* ============================================================
+   ROOT / RESET
+   ============================================================ */
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root{
+  --bg:#050505;
+  --panel:#0a0d0a;
+  --panel-2:#0d110d;
+  --green:#00ff66;
+  --green-dim:#0a4d26;
+  --green-mid:#08331a;
+  --red:#ff3b3b;
+  --amber:#ffcc00;
+  --text-dim:#4d8f66;
+  --border:#0f3d20;
+  --glow:0 0 6px rgba(0,255,102,0.55);
+}
+
+html,body{
+  background:var(--bg);
+  color:var(--green);
+  font-family:'Courier New', 'Consolas', monospace;
+  height:100%;
+  overflow-x:hidden;
+}
+
+::selection{ background:var(--green); color:#000; }
+
+::-webkit-scrollbar{ width:8px; }
+::-webkit-scrollbar-track{ background:#000; }
+::-webkit-scrollbar-thumb{ background:var(--green-dim); border:1px solid var(--border); }
+::-webkit-scrollbar-thumb:hover{ background:var(--green); }
+
+/* ============================================================
+   CRT / SCANLINE / PARTICLE LAYERS
+   ============================================================ */
+.crt-overlay{
+  pointer-events:none;
+  position:fixed; inset:0; z-index:9999;
+  background:
+    repeating-linear-gradient(
+      0deg,
+      rgba(0,255,102,0.035) 0px,
+      rgba(0,255,102,0.035) 1px,
+      transparent 2px,
+      transparent 3px
+    );
+  mix-blend-mode:overlay;
+}
+
+.crt-vignette{
+  pointer-events:none;
+  position:fixed; inset:0; z-index:9998;
+  background:radial-gradient(ellipse at center, rgba(0,0,0,0) 55%, rgba(0,0,0,0.65) 100%);
+}
+
+.crt-flicker{
+  pointer-events:none;
+  position:fixed; inset:0; z-index:9997;
+  background:rgba(0,255,102,0.02);
+  animation:flicker 6s infinite;
+}
+
+@keyframes flicker{
+  0%,100%{ opacity:0; }
+  92%{ opacity:0; }
+  93%{ opacity:1; }
+  94%{ opacity:0; }
+  96%{ opacity:0.4; }
+  97%{ opacity:0; }
+}
+
+#particles{
+  position:fixed; inset:0; z-index:0;
+  pointer-events:none;
+}
+
+/* ============================================================
+   LAYOUT SHELL
+   ============================================================ */
+.app{
+  position:relative;
+  z-index:1;
+  min-height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* ============================================================
+   HEADER
+   ============================================================ */
+header{
+  border-bottom:1px solid var(--border);
+  background:linear-gradient(180deg, #0a0f0a 0%, #050505 100%);
+  padding:14px 22px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  flex-wrap:wrap;
+  gap:10px;
+  box-shadow:0 1px 12px rgba(0,255,102,0.08);
+}
+
+.brand{
+  display:flex;
+  align-items:baseline;
+  gap:12px;
+}
+
+.brand .title{
+  font-size:22px;
+  font-weight:bold;
+  letter-spacing:4px;
+  text-shadow:var(--glow);
+}
+
+.brand .version{
+  font-size:11px;
+  color:var(--text-dim);
+  letter-spacing:1px;
+}
+
+.header-status{
+  display:flex;
+  align-items:center;
+  gap:22px;
+  font-size:12px;
+  letter-spacing:1px;
+  flex-wrap:wrap;
+}
+
+.status-item{
+  display:flex;
+  align-items:center;
+  gap:7px;
+  color:var(--text-dim);
+}
+
+.status-dot{
+  width:8px; height:8px;
+  border-radius:50%;
+  background:var(--green);
+  box-shadow:0 0 8px var(--green), 0 0 2px var(--green);
+  animation:pulse-dot 1.6s infinite ease-in-out;
+}
+
+.status-dot.offline{
+  background:var(--red);
+  box-shadow:0 0 8px var(--red);
+}
+
+.status-dot.warn{
+  background:var(--amber);
+  box-shadow:0 0 8px var(--amber);
+}
+
+@keyframes pulse-dot{
+  0%,100%{ opacity:1; }
+  50%{ opacity:0.35; }
+}
+
+.clock{
+  color:var(--green);
+  font-weight:bold;
+  min-width:82px;
+  text-align:right;
+}
+
+/* ============================================================
+   MAIN GRID
+   ============================================================ */
+.main-grid{
+  flex:1;
+  display:grid;
+  grid-template-columns:300px 1fr 320px;
+  gap:16px;
+  padding:16px 22px;
+}
+
+@media (max-width: 1080px){
+  .main-grid{ grid-template-columns:1fr; }
+}
+
+.panel{
+  background:var(--panel);
+  border:1px solid var(--border);
+  position:relative;
+  box-shadow:inset 0 0 30px rgba(0,255,102,0.03), var(--glow);
+}
+
+.panel::before{
+  content:'';
+  position:absolute;
+  top:0; left:0; right:0;
+  height:2px;
+  background:linear-gradient(90deg, transparent, var(--green), transparent);
+  opacity:0.6;
+}
+
+.panel-header{
+  padding:10px 14px;
+  border-bottom:1px solid var(--border);
+  font-size:12px;
+  letter-spacing:3px;
+  color:var(--green);
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  background:linear-gradient(90deg, rgba(0,255,102,0.06), transparent);
+}
+
+.panel-body{
+  padding:16px;
+}
+
+.corner-tag{
+  font-size:9px;
+  color:var(--text-dim);
+  letter-spacing:1px;
+}
+
+/* ============================================================
+   LEFT PANEL - CONTROLS
+   ============================================================ */
+.field-label{
+  font-size:11px;
+  letter-spacing:2px;
+  color:var(--text-dim);
+  margin-bottom:8px;
+  display:block;
+}
+
+.select-wrap{
+  position:relative;
+  margin-bottom:20px;
+}
+
+select{
+  width:100%;
+  background:#000;
+  color:var(--green);
+  border:1px solid var(--border);
+  padding:10px 12px;
+  font-family:inherit;
+  font-size:13px;
+  letter-spacing:1px;
+  appearance:none;
+  cursor:pointer;
+  outline:none;
+  transition:border-color 0.2s, box-shadow 0.2s;
+}
+
+select:hover, select:focus{
+  border-color:var(--green);
+  box-shadow:0 0 8px rgba(0,255,102,0.35);
+}
+
+.select-arrow{
+  position:absolute;
+  right:12px;
+  top:50%;
+  transform:translateY(-50%);
+  pointer-events:none;
+  color:var(--text-dim);
+  font-size:10px;
+}
+
+.tf-grid{
+  display:grid;
+  grid-template-columns:repeat(3, 1fr);
+  gap:8px;
+  margin-bottom:22px;
+}
+
+.tf-btn{
+  background:#000;
+  border:1px solid var(--border);
+  color:var(--text-dim);
+  padding:9px 4px;
+  font-family:inherit;
+  font-size:12px;
+  letter-spacing:1px;
+  cursor:pointer;
+  transition:all 0.15s;
+}
+
+.tf-btn:hover{
+  border-color:var(--green);
+  color:var(--green);
+}
+
+.tf-btn.active{
+  background:var(--green-mid);
+  border-color:var(--green);
+  color:var(--green);
+  box-shadow:0 0 10px rgba(0,255,102,0.4);
+}
+
+.analyze-btn{
+  width:100%;
+  padding:16px 10px;
+  background:#000;
+  border:2px solid var(--green);
+  color:var(--green);
+  font-family:inherit;
+  font-size:14px;
+  font-weight:bold;
+  letter-spacing:3px;
+  cursor:pointer;
+  position:relative;
+  overflow:hidden;
+  box-shadow:0 0 14px rgba(0,255,102,0.35), inset 0 0 14px rgba(0,255,102,0.08);
+  transition:transform 0.1s, box-shadow 0.2s;
+}
+
+.analyze-btn:hover{
+  box-shadow:0 0 26px rgba(0,255,102,0.65), inset 0 0 20px rgba(0,255,102,0.15);
+}
+
+.analyze-btn:active{
+  transform:scale(0.98);
+}
+
+.analyze-btn:disabled{
+  opacity:0.45;
+  cursor:not-allowed;
+  box-shadow:none;
+}
+
+.analyze-btn .scan-line{
+  position:absolute;
+  top:0; left:-100%;
+  width:60%; height:100%;
+  background:linear-gradient(90deg, transparent, rgba(0,255,102,0.35), transparent);
+  animation:scan-sweep 2.4s linear infinite;
+}
+
+@keyframes scan-sweep{
+  0%{ left:-60%; }
+  100%{ left:120%; }
+}
+
+.mini-info{
+  margin-top:18px;
+  padding-top:14px;
+  border-top:1px dashed var(--border);
+  font-size:11px;
+  color:var(--text-dim);
+  line-height:1.7;
+}
+
+.mini-info span{ color:var(--green); }
+
+/* ============================================================
+   CENTER PANEL - CHART / PRICE STRIP
+   ============================================================ */
+.price-strip{
+  display:flex;
+  justify-content:space-between;
+  align-items:flex-end;
+  padding-bottom:14px;
+  margin-bottom:14px;
+  border-bottom:1px solid var(--border);
+  flex-wrap:wrap;
+  gap:10px;
+}
+
+.price-main .pair-name{
+  font-size:20px;
+  letter-spacing:2px;
+  font-weight:bold;
+}
+
+.price-main .pair-price{
+  font-size:34px;
+  font-weight:bold;
+  text-shadow:var(--glow);
+  letter-spacing:1px;
+}
+
+.price-meta{
+  display:flex;
+  gap:18px;
+  font-size:11px;
+  color:var(--text-dim);
+}
+
+.price-meta div span{
+  display:block;
+  color:var(--green);
+  font-size:13px;
+  margin-top:2px;
+}
+
+#chartCanvas{
+  width:100%;
+  height:340px;
+  display:block;
+  background:
+    linear-gradient(rgba(0,255,102,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0,255,102,0.05) 1px, transparent 1px);
+  background-size:40px 34px;
+  border:1px solid var(--border);
+}
+
+.indicator-row{
+  display:grid;
+  grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+  gap:10px;
+  margin-top:14px;
+}
+
+.ind-box{
+  border:1px solid var(--border);
+  padding:10px;
+  text-align:center;
+  background:#000;
+}
+
+.ind-box .ind-label{
+  font-size:10px;
+  color:var(--text-dim);
+  letter-spacing:1px;
+  margin-bottom:4px;
+}
+
+.ind-box .ind-val{
+  font-size:15px;
+  font-weight:bold;
+}
+
+/* ============================================================
+   RIGHT PANEL - SIGNAL OUTPUT
+   ============================================================ */
+.signal-display{
+  text-align:center;
+  padding:18px 10px;
+  border:1px solid var(--border);
+  margin-bottom:16px;
+  background:#000;
+  position:relative;
+}
+
+.signal-value{
+  font-size:30px;
+  font-weight:bold;
+  letter-spacing:3px;
+  margin-bottom:6px;
+}
+
+.signal-value.buy{ color:var(--green); text-shadow:0 0 14px var(--green); }
+.signal-value.sell{ color:var(--red); text-shadow:0 0 14px var(--red); }
+.signal-value.notrade{ color:var(--amber); text-shadow:0 0 14px var(--amber); }
+.signal-value.idle{ color:var(--text-dim); text-shadow:none; }
+
+.confidence-label{
+  font-size:11px;
+  color:var(--text-dim);
+  letter-spacing:2px;
+}
+
+.confidence-bar-track{
+  width:100%;
+  height:8px;
+  background:#111;
+  border:1px solid var(--border);
+  margin-top:10px;
+  overflow:hidden;
+}
+
+.confidence-bar-fill{
+  height:100%;
+  width:0%;
+  background:linear-gradient(90deg, var(--green-dim), var(--green));
+  box-shadow:0 0 8px var(--green);
+  transition:width 0.8s ease;
+}
+
+.data-rows{
+  display:flex;
+  flex-direction:column;
+  gap:0;
+}
+
+.data-row{
+  display:flex;
+  justify-content:space-between;
+  padding:9px 0;
+  border-bottom:1px dashed var(--border);
+  font-size:12px;
+}
+
+.data-row .k{
+  color:var(--text-dim);
+  letter-spacing:1px;
+}
+
+.data-row .v{
+  font-weight:bold;
+  color:var(--green);
+}
+
+.data-row .v.red{ color:var(--red); }
+.data-row .v.amber{ color:var(--amber); }
+
+.explanation-box{
+  margin-top:16px;
+  border-top:1px solid var(--border);
+  padding-top:14px;
+}
+
+.explanation-box .exp-title{
+  font-size:11px;
+  letter-spacing:2px;
+  color:var(--text-dim);
+  margin-bottom:10px;
+}
+
+.exp-item{
+  font-size:12px;
+  padding:4px 0;
+  line-height:1.5;
+  color:#8fe0ab;
+}
+
+.exp-item.neg{ color:#a0544f; }
+
+/* ============================================================
+   BOTTOM CONSOLE
+   ============================================================ */
+.console-panel{
+  margin:0 22px 22px 22px;
+}
+
+.console-body{
+  height:220px;
+  overflow-y:auto;
+  padding:14px 16px;
+  font-size:12.5px;
+  line-height:1.65;
+  background:#000;
+}
+
+.console-line{
+  white-space:pre-wrap;
+  word-break:break-word;
+}
+
+.console-line .ts{
+  color:var(--text-dim);
+  margin-right:8px;
+}
+
+.console-line.err{ color:var(--red); }
+.console-line.ok{ color:var(--green); }
+.console-line.warn{ color:var(--amber); }
+
+.cursor-blink{
+  display:inline-block;
+  width:8px;
+  height:14px;
+  background:var(--green);
+  animation:blink 1s step-start infinite;
+  vertical-align:middle;
+  margin-left:2px;
+}
+
+@keyframes blink{
+  50%{ opacity:0; }
+}
+
+/* ============================================================
+   API KEY MODAL
+   ============================================================ */
+.modal-overlay{
+  position:fixed; inset:0;
+  background:rgba(0,0,0,0.85);
+  z-index:10000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding:20px;
+}
+
+.modal-box{
+  background:var(--panel);
+  border:1px solid var(--green);
+  box-shadow:0 0 30px rgba(0,255,102,0.35);
+  max-width:460px;
+  width:100%;
+  padding:24px;
+}
+
+.modal-box h2{
+  font-size:15px;
+  letter-spacing:2px;
+  margin-bottom:14px;
+  color:var(--green);
+}
+
+.modal-box p{
+  font-size:12px;
+  color:var(--text-dim);
+  line-height:1.7;
+  margin-bottom:16px;
+}
+
+.modal-box input{
+  width:100%;
+  background:#000;
+  border:1px solid var(--border);
+  color:var(--green);
+  padding:10px 12px;
+  font-family:inherit;
+  font-size:13px;
+  outline:none;
+  margin-bottom:14px;
+}
+
+.modal-box input:focus{
+  border-color:var(--green);
+  box-shadow:0 0 8px rgba(0,255,102,0.3);
+}
+
+.modal-box button{
+  width:100%;
+  padding:12px;
+  background:#000;
+  border:2px solid var(--green);
+  color:var(--green);
+  font-family:inherit;
+  letter-spacing:2px;
+  cursor:pointer;
+  font-weight:bold;
+}
+
+.modal-box button:hover{
+  box-shadow:0 0 16px rgba(0,255,102,0.5);
+}
+
+.modal-small{
+  font-size:10px;
+  color:var(--text-dim);
+  margin-top:12px;
+  line-height:1.6;
+}
+
+/* ============================================================
+   FOOTER
+   ============================================================ */
+footer{
+  text-align:center;
+  font-size:10px;
+  color:var(--text-dim);
+  letter-spacing:1px;
+  padding:10px 0 20px 0;
+}
+</style>
+</head>
+<body>
+
+<!-- CRT / Visual FX layers -->
+<div class="crt-overlay"></div>
+<div class="crt-vignette"></div>
+<div class="crt-flicker"></div>
+<canvas id="particles"></canvas>
+
+<!-- API Key Setup Modal -->
+<div class="modal-overlay" id="apiModal">
+  <div class="modal-box">
+    <h2>&gt; TWELVE DATA API KEY REQUIRED_</h2>
+    <p>This terminal fetches live OHLC candle data from the Twelve Data REST API. Enter your free API key to initialize the connection. Your key is stored only in this browser session.</p>
+    <input type="text" id="apiKeyInput" placeholder="PASTE YOUR TWELVE DATA API KEY..." autocomplete="off">
+    <button id="apiKeySubmit">INITIALIZE TERMINAL</button>
+    <div class="modal-small">
+      Get a free key at twelvedata.com/apikey — free tier includes real-time & historical Forex candles.
+      No key is transmitted anywhere except directly to api.twelvedata.com.
+    </div>
+  </div>
+</div>
+
+<div class="app">
+
+  <!-- ============================== HEADER ============================== -->
+  <header>
+    <div class="brand">
+      <div class="title">FOREX TERMINAL</div>
+      <div class="version">v2.1.0 // ANALYSIS SYSTEM</div>
+    </div>
+    <div class="header-status">
+      <div class="status-item"><span class="status-dot" id="onlineDot"></span> <span id="onlineText">ONLINE</span></div>
+      <div class="status-item"><span class="status-dot warn" id="apiDot"></span> <span id="apiStatusText">API: NOT CONNECTED</span></div>
+      <div class="status-item">SYS TIME: <span class="clock" id="clock">00:00:00</span></div>
+    </div>
+  </header>
+
+  <!-- ============================== MAIN GRID ============================== -->
+  <div class="main-grid">
+
+    <!-- LEFT PANEL: CONTROLS -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>&gt; CONTROL PANEL</span>
+        <span class="corner-tag">CFG-01</span>
+      </div>
+      <div class="panel-body">
+
+        <label class="field-label">CURRENCY PAIR</label>
+        <div class="select-wrap">
+          <select id="pairSelect">
+            <option value="EUR/USD">EUR/USD</option>
+            <option value="GBP/USD">GBP/USD</option>
+            <option value="USD/JPY">USD/JPY</option>
+            <option value="USD/CHF">USD/CHF</option>
+            <option value="AUD/USD">AUD/USD</option>
+            <option value="NZD/USD">NZD/USD</option>
+            <option value="USD/CAD">USD/CAD</option>
+            <option value="EUR/GBP">EUR/GBP</option>
+            <option value="EUR/JPY">EUR/JPY</option>
+            <option value="GBP/JPY">GBP/JPY</option>
+          </select>
+          <div class="select-arrow">▼</div>
+        </div>
+
+        <label class="field-label">TIMEFRAME</label>
+        <div class="tf-grid" id="tfGrid">
+          <button class="tf-btn" data-tf="5min">M5</button>
+          <button class="tf-btn" data-tf="15min">M15</button>
+          <button class="tf-btn" data-tf="30min">M30</button>
+          <button class="tf-btn active" data-tf="1h">H1</button>
+          <button class="tf-btn" data-tf="4h">H4</button>
+          <button class="tf-btn" data-tf="1day">D1</button>
+        </div>
+
+        <button class="analyze-btn" id="analyzeBtn">
+          <span class="scan-line"></span>
+          ▶ ANALYZE MARKET
+        </button>
+
+        <div class="mini-info">
+          DATA SOURCE: <span>TWELVE DATA</span><br>
+          CANDLE DEPTH: <span>500</span><br>
+          MODE: <span>ANALYSIS ONLY — NO AUTO-EXECUTION</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- CENTER PANEL: CHART -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>&gt; MARKET DATA</span>
+        <span class="corner-tag" id="chartTag">NO DATA</span>
+      </div>
+      <div class="panel-body">
+
+        <div class="price-strip">
+          <div class="price-main">
+            <div class="pair-name" id="displayPair">EUR/USD</div>
+            <div class="pair-price" id="displayPrice">--.-----</div>
+          </div>
+          <div class="price-meta">
+            <div>24H HIGH<span id="metaHigh">--</span></div>
+            <div>24H LOW<span id="metaLow">--</span></div>
+            <div>ATR(14)<span id="metaAtr">--</span></div>
+            <div>SPREAD EST.<span id="metaSpread">--</span></div>
+          </div>
+        </div>
+
+        <canvas id="chartCanvas"></canvas>
+
+        <div class="indicator-row">
+          <div class="ind-box"><div class="ind-label">EMA 20</div><div class="ind-val" id="indEma20">--</div></div>
+          <div class="ind-box"><div class="ind-label">EMA 50</div><div class="ind-val" id="indEma50">--</div></div>
+          <div class="ind-box"><div class="ind-label">RSI 14</div><div class="ind-val" id="indRsi">--</div></div>
+          <div class="ind-box"><div class="ind-label">MACD</div><div class="ind-val" id="indMacd">--</div></div>
+          <div class="ind-box"><div class="ind-label">STRUCTURE</div><div class="ind-val" id="indStructure">--</div></div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- RIGHT PANEL: SIGNAL -->
+    <div class="panel">
+      <div class="panel-header">
+        <span>&gt; SIGNAL OUTPUT</span>
+        <span class="corner-tag">SIG-01</span>
+      </div>
+      <div class="panel-body">
+
+        <div class="signal-display">
+          <div class="signal-value idle" id="signalValue">STANDBY</div>
+          <div class="confidence-label">CONFIDENCE: <span id="confidenceText">0%</span></div>
+          <div class="confidence-bar-track"><div class="confidence-bar-fill" id="confidenceBar"></div></div>
+        </div>
+
+        <div class="data-rows">
+          <div class="data-row"><span class="k">TREND</span><span class="v" id="rowTrend">--</span></div>
+          <div class="data-row"><span class="k">MARKET BIAS</span><span class="v" id="rowBias">--</span></div>
+          <div class="data-row"><span class="k">S · L · C</span><span class="v" id="rowSLC">--</span></div>
+          <div class="data-row"><span class="k">SMC SETUP</span><span class="v" id="rowSMC">--</span></div>
+          <div class="data-row"><span class="k">ENTRY</span><span class="v" id="rowEntry">--</span></div>
+          <div class="data-row"><span class="k">STOP LOSS</span><span class="v red" id="rowSL">--</span></div>
+          <div class="data-row"><span class="k">TAKE PROFIT</span><span class="v" id="rowTP">--</span></div>
+          <div class="data-row"><span class="k">RISK:REWARD</span><span class="v amber" id="rowRR">--</span></div>
+        </div>
+
+        <div class="explanation-box">
+          <div class="exp-title">&gt; CONFLUENCE LOG</div>
+          <div id="explanationList">
+            <div class="exp-item">Awaiting analysis...</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ============================== BOTTOM CONSOLE ============================== -->
+  <div class="panel console-panel">
+    <div class="panel-header">
+      <span>&gt; SYSTEM CONSOLE</span>
+      <span class="corner-tag">LOG-01</span>
+    </div>
+    <div class="console-body" id="consoleBody"></div>
+  </div>
+
+  <footer>
+    FOREX TERMINAL // ANALYSIS ONLY — NO SIGNAL CONSTITUTES FINANCIAL ADVICE — NOT AN AUTOMATED TRADING SYSTEM
+  </footer>
+
+</div>
+
+<script>
+/* ============================================================================
+   FOREX TERMINAL — ANALYSIS ENGINE
+   ============================================================================
+   Structure:
+     1. Global State & Config
+     2. Utility / DOM Helpers
+     3. Console Typing Engine
+     4. Clock & Background FX (particles)
+     5. Twelve Data API Layer
+     6. Technical Indicator Library (EMA, RSI, MACD, ATR)
+     7. Market Structure Engine (Swings, HH/HL/LH/LL, BOS, Trend)
+     8. Supply / Demand / Liquidity Engine
+     9. Candlestick Pattern Detection
+    10. Signal Decision Engine (confluence scoring)
+    11. Chart Renderer (canvas candlesticks)
+    12. UI Binding / Orchestration
+   ============================================================================ */
+
+/* ============================================================
+   1. GLOBAL STATE & CONFIG
+   ============================================================ */
+const APP_STATE = {
+  apiKey: null,
+  pair: "EUR/USD",
+  timeframe: "1h",
+  candles: [],        // [{time, open, high, low, close}, ...] oldest -> newest
+  isAnalyzing: false,
+  lastResult: null
+};
+
+const CANDLE_COUNT = 500;
+
+/* ============================================================
+   2. UTILITY / DOM HELPERS
+   ============================================================ */
+const $ = (id) => document.getElementById(id);
+
+function decimalsForPair(pair){
+  return pair.includes("JPY") ? 3 : 5;
+}
+
+function fmt(num, decimals){
+  if (num === null || num === undefined || isNaN(num)) return "--";
+  return Number(num).toFixed(decimals);
+}
+
+function pad(n){ return n.toString().padStart(2,"0"); }
+
+function nowTimeString(){
+  const d = new Date();
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
+/* ============================================================
+   3. CONSOLE TYPING ENGINE
+   ============================================================ */
+const consoleBody = $("consoleBody");
+let consoleQueue = [];
+let consoleTyping = false;
+
+function queueConsoleLine(text, cls){
+  consoleQueue.push({ text, cls: cls || "" });
+  if (!consoleTyping) processConsoleQueue();
+}
+
+function processConsoleQueue(){
+  if (consoleQueue.length === 0){
+    consoleTyping = false;
+    return;
+  }
+  consoleTyping = true;
+  const item = consoleQueue.shift();
+  typeLine(item.text, item.cls, () => {
+    setTimeout(processConsoleQueue, 90);
+  });
+}
+
+function typeLine(text, cls, onDone){
+  const line = document.createElement("div");
+  line.className = "console-line " + cls;
+
+  const ts = document.createElement("span");
+  ts.className = "ts";
+  ts.textContent = `[${nowTimeString()}]`;
+  line.appendChild(ts);
+
+  const textSpan = document.createElement("span");
+  line.appendChild(textSpan);
+
+  const cursor = document.createElement("span");
+  cursor.className = "cursor-blink";
+  line.appendChild(cursor);
+
+  consoleBody.appendChild(line);
+  consoleBody.scrollTop = consoleBody.scrollHeight;
+
+  let i = 0;
+  const speed = 12; // ms per character
+  const interval = setInterval(() => {
+    textSpan.textContent += text.charAt(i);
+    i++;
+    consoleBody.scrollTop = consoleBody.scrollHeight;
+    if (i >= text.length){
+      clearInterval(interval);
+      cursor.remove();
+      if (onDone) onDone();
+    }
+  }, speed);
+}
+
+function clearConsoleCursorLingering(){
+  // Removes any stray blinking cursors from completed lines (safety)
+  document.querySelectorAll(".cursor-blink").forEach(c => c.remove());
+}
+
+/* ============================================================
+   4. CLOCK & BACKGROUND PARTICLE FX
+   ============================================================ */
+function tickClock(){
+  $("clock").textContent = nowTimeString();
+}
+setInterval(tickClock, 1000);
+tickClock();
+
+(function initParticles(){
+  const canvas = $("particles");
+  const ctx = canvas.getContext("2d");
+  let w, h, particles;
+
+  function resize(){
+    w = canvas.width = window.innerWidth;
+    h = canvas.height = window.innerHeight;
+  }
+  window.addEventListener("resize", resize);
+  resize();
+
+  function makeParticles(){
+    const count = Math.floor((w * h) / 22000);
+    particles = [];
+    for (let i = 0; i < count; i++){
+      particles.push({
+        x: Math.random() * w,
+        y: Math.random() * h,
+        r: Math.random() * 1.4 + 0.3,
+        vy: Math.random() * 0.25 + 0.05,
+        alpha: Math.random() * 0.5 + 0.1
+      });
+    }
+  }
+  makeParticles();
+
+  function draw(){
+    ctx.clearRect(0, 0, w, h);
+    ctx.fillStyle = "#00ff66";
+    for (const p of particles){
+      ctx.globalAlpha = p.alpha;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fill();
+      p.y -= p.vy;
+      if (p.y < 0){ p.y = h; p.x = Math.random() * w; }
+    }
+    ctx.globalAlpha = 1;
+    requestAnimationFrame(draw);
+  }
+  draw();
+})();
+
+/* ============================================================
+   5. TWELVE DATA API LAYER
+   ============================================================ */
+const TwelveDataAPI = {
+  baseUrl: "https://api.twelvedata.com/time_series",
+
+  async fetchCandles(pair, interval, outputsize){
+    if (!APP_STATE.apiKey){
+      throw new Error("API key not set.");
+    }
+    const url = `${this.baseUrl}?symbol=${encodeURIComponent(pair)}&interval=${encodeURIComponent(interval)}&outputsize=${outputsize}&apikey=${encodeURIComponent(APP_STATE.apiKey)}&order=ASC`;
+
+    const response = await fetch(url);
+    if (!response.ok){
+      throw new Error(`HTTP error ${response.status}`);
+    }
+    const data = await response.json();
+
+    if (data.status === "error"){
+      throw new Error(data.message || "Twelve Data API returned an error.");
+    }
+    if (!data.values || !Array.isArray(data.values) || data.values.length === 0){
+      throw new Error("No candle data returned for this pair/timeframe.");
+    }
+
+    // Twelve Data returns strings; normalize to numeric OHLC objects.
+    const candles = data.values.map(v => ({
+      time: v.datetime,
+      open: parseFloat(v.open),
+      high: parseFloat(v.high),
+      low: parseFloat(v.low),
+      close: parseFloat(v.close)
+    })).filter(c =>
+      !isNaN(c.open) && !isNaN(c.high) && !isNaN(c.low) && !isNaN(c.close)
+    );
+
+    // Ensure ascending chronological order (oldest -> newest)
+    candles.sort((a, b) => new Date(a.time) - new Date(b.time));
+    return candles;
+  }
+};
+
+/* ============================================================
+   6. TECHNICAL INDICATOR LIBRARY
+   ============================================================ */
+const Indicators = {
+
+  ema(values, period){
+    const k = 2 / (period + 1);
+    const result = new Array(values.length).fill(null);
+    let emaPrev = null;
+    for (let i = 0; i < values.length; i++){
+      if (i === period - 1){
+        // seed with SMA
+        const slice = values.slice(0, period);
+        emaPrev = slice.reduce((a, b) => a + b, 0) / period;
+        result[i] = emaPrev;
+      } else if (i >= period){
+        emaPrev = values[i] * k + emaPrev * (1 - k);
+        result[i] = emaPrev;
+      }
+    }
+    return result;
+  },
+
+  rsi(values, period){
+    const result = new Array(values.length).fill(null);
+    if (values.length <= period) return result;
+
+    let gains = 0, losses = 0;
+    for (let i = 1; i <= period; i++){
+      const diff = values[i] - values[i - 1];
+      if (diff >= 0) gains += diff; else losses -= diff;
+    }
+    let avgGain = gains / period;
+    let avgLoss = losses / period;
+    result[period] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+
+    for (let i = period + 1; i < values.length; i++){
+      const diff = values[i] - values[i - 1];
+      const gain = diff > 0 ? diff : 0;
+      const loss = diff < 0 ? -diff : 0;
+      avgGain = (avgGain * (period - 1) + gain) / period;
+      avgLoss = (avgLoss * (period - 1) + loss) / period;
+      result[i] = avgLoss === 0 ? 100 : 100 - (100 / (1 + (avgGain / avgLoss)));
+    }
+    return result;
+  },
+
+  macd(values, fastPeriod, slowPeriod, signalPeriod){
+    const emaFast = this.ema(values, fastPeriod);
+    const emaSlow = this.ema(values, slowPeriod);
+    const macdLine = values.map((_, i) =>
+      (emaFast[i] !== null && emaSlow[i] !== null) ? emaFast[i] - emaSlow[i] : null
+    );
+
+    const macdValuesOnly = macdLine.filter(v => v !== null);
+    const signalRaw = this.ema(macdValuesOnly, signalPeriod);
+
+    // Re-align signal line back to full-length array
+    const signalLine = new Array(values.length).fill(null);
+    let offset = macdLine.findIndex(v => v !== null);
+    for (let i = 0; i < signalRaw.length; i++){
+      if (signalRaw[i] !== null){
+        signalLine[offset + i] = signalRaw[i];
+      }
+    }
+
+    const histogram = values.map((_, i) =>
+      (macdLine[i] !== null && signalLine[i] !== null) ? macdLine[i] - signalLine[i] : null
+    );
+
+    return { macdLine, signalLine, histogram };
+  },
+
+  atr(candles, period){
+    const trs = [];
+    for (let i = 0; i < candles.length; i++){
+      if (i === 0){
+        trs.push(candles[i].high - candles[i].low);
+        continue;
+      }
+      const prevClose = candles[i - 1].close;
+      const tr = Math.max(
+        candles[i].high - candles[i].low,
+        Math.abs(candles[i].high - prevClose),
+        Math.abs(candles[i].low - prevClose)
+      );
+      trs.push(tr);
+    }
+    const result = new Array(candles.length).fill(null);
+    if (trs.length < period) return result;
+
+    let atrPrev = trs.slice(0, period).reduce((a, b) => a + b, 0) / period;
+    result[period - 1] = atrPrev;
+    for (let i = period; i < trs.length; i++){
+      atrPrev = (atrPrev * (period - 1) + trs[i]) / period;
+      result[i] = atrPrev;
+    }
+    return result;
+  }
+};
+
+/* ============================================================
+   7. MARKET STRUCTURE ENGINE
+   ============================================================ */
+const StructureEngine = {
+
+  // Identify swing highs/lows using a fractal window (default 2 bars each side)
+  findSwings(candles, window = 2){
+    const swingHighs = [];
+    const swingLows = [];
+
+    for (let i = window; i < candles.length - window; i++){
+      const slice = candles.slice(i - window, i + window + 1);
+      const current = candles[i];
+
+      const isHigh = slice.every(c => c.high <= current.high);
+      const isLow = slice.every(c => c.low >= current.low);
+
+      if (isHigh) swingHighs.push({ index: i, price: current.high, time: current.time });
+      if (isLow) swingLows.push({ index: i, price: current.low, time: current.time });
+    }
+    return { swingHighs, swingLows };
+  },
+
+  // Classify the last few swings into HH / HL / LH / LL sequence
+  classifySwingSequence(swingHighs, swingLows){
+    const classification = { highs: [], lows: [] };
+
+    for (let i = 1; i < swingHighs.length; i++){
+      classification.highs.push(
+        swingHighs[i].price > swingHighs[i - 1].price ? "HH" : "LH"
+      );
+    }
+    for (let i = 1; i < swingLows.length; i++){
+      classification.lows.push(
+        swingLows[i].price > swingLows[i - 1].price ? "HL" : "LL"
+      );
+    }
+    return classification;
+  },
+
+  // Determine overall trend from swing classification
+  determineTrend(classification){
+    const recentHighs = classification.highs.slice(-3);
+    const recentLows = classification.lows.slice(-3);
+
+    const bullHighs = recentHighs.filter(x => x === "HH").length;
+    const bullLows = recentLows.filter(x => x === "HL").length;
+    const bearHighs = recentHighs.filter(x => x === "LH").length;
+    const bearLows = recentLows.filter(x => x === "LL").length;
+
+    const bullScore = bullHighs + bullLows;
+    const bearScore = bearHighs + bearLows;
+
+    if (bullScore >= 3 && bullScore > bearScore) return "BULLISH";
+    if (bearScore >= 3 && bearScore > bullScore) return "BEARISH";
+    return "RANGING";
+  },
+
+  // Detect Break of Structure: price closes beyond the most recent
+  // significant swing high (bullish BOS) or swing low (bearish BOS).
+  detectBOS(candles, swingHighs, swingLows){
+    if (swingHighs.length === 0 || swingLows.length === 0){
+      return { type: "NONE", level: null };
+    }
+
+    const lastHigh = swingHighs[swingHighs.length - 1];
+    const lastLow = swingLows[swingLows.length - 1];
+    const lastCandles = candles.slice(-10);
+
+    let bullishBOS = false;
+    let bearishBOS = false;
+
+    for (const c of lastCandles){
+      if (c.close > lastHigh.price) bullishBOS = true;
+      if (c.close < lastLow.price) bearishBOS = true;
+    }
+
+    if (bullishBOS && !bearishBOS) return { type: "BULLISH_BOS", level: lastHigh.price };
+    if (bearishBOS && !bullishBOS) return { type: "BEARISH_BOS", level: lastLow.price };
+    return { type: "NONE", level: null };
+  }
+};
+
+/* ============================================================
+   8. SUPPLY / DEMAND / LIQUIDITY ENGINE
+   ============================================================ */
+const ZoneEngine = {
+
+  // Demand zone: the last down-close candle immediately preceding
+  // a strong bullish impulse (base-before-rally pattern).
+  // Supply zone: the last up-close candle immediately preceding
+  // a strong bearish impulse (base-before-drop pattern).
+  findSupplyDemandZones(candles, atrSeries){
+    const demandZones = [];
+    const supplyZones = [];
+
+    for (let i = 3; i < candles.length - 1; i++){
+      const atr = atrSeries[i] || (candles[i].high - candles[i].low);
+      const impulse = candles[i + 1];
+      const impulseRange = impulse.high - impulse.low;
+      const isStrongImpulse = impulseRange > atr * 1.3;
+
+      const base = candles[i];
+      const baseIsDown = base.close < base.open;
+      const baseIsUp = base.close > base.open;
+
+      if (isStrongImpulse && impulse.close > impulse.open && baseIsDown){
+        demandZones.push({
+          index: i,
+          top: base.high,
+          bottom: base.low,
+          time: base.time
+        });
+      }
+      if (isStrongImpulse && impulse.close < impulse.open && baseIsUp){
+        supplyZones.push({
+          index: i,
+          top: base.high,
+          bottom: base.low,
+          time: base.time
+        });
+      }
+    }
+
+    // Keep only the most recent, most relevant zones
+    return {
+      demandZones: demandZones.slice(-3),
+      supplyZones: supplyZones.slice(-3)
+    };
+  },
+
+  // Liquidity sweep: a candle wicks beyond a recent swing point but
+  // closes back inside the range (stop-hunt style rejection). Scans
+  // the last few candles (not just the latest) since a trader would
+  // be watching a level over a short window, not a single tick.
+  detectLiquiditySweep(candles, swingHighs, swingLows){
+    const recentHigh = swingHighs.length ? swingHighs[swingHighs.length - 1].price : null;
+    const recentLow = swingLows.length ? swingLows[swingLows.length - 1].price : null;
+    const window = candles.slice(-5);
+
+    let sweepHigh = false;
+    let sweepLow = false;
+
+    for (const c of window){
+      if (recentHigh && c.high > recentHigh && c.close < recentHigh) sweepHigh = true;
+      if (recentLow && c.low < recentLow && c.close > recentLow) sweepLow = true;
+    }
+
+    return { sweepHigh, sweepLow };
+  },
+
+  // Basic support/resistance from the highest high and lowest low
+  // over the visible lookback window.
+  findSupportResistance(candles, lookback = 100){
+    const slice = candles.slice(-lookback);
+    const resistance = Math.max(...slice.map(c => c.high));
+    const support = Math.min(...slice.map(c => c.low));
+    return { support, resistance };
+  },
+
+  // Check whether current price sits inside (or just reclaimed) a zone
+  priceRespectsZone(currentPrice, zones, type){
+    for (const z of zones){
+      if (currentPrice >= z.bottom && currentPrice <= z.top){
+        return true;
+      }
+      // "just reclaimed" - price recently traded through the zone
+      const buffer = (z.top - z.bottom) * 0.5;
+      if (type === "demand" && currentPrice <= z.top + buffer && currentPrice >= z.bottom - buffer){
+        return true;
+      }
+      if (type === "supply" && currentPrice >= z.bottom - buffer && currentPrice <= z.top + buffer){
+        return true;
+      }
+    }
+    return false;
+  }
+};
+
+/* ============================================================
+   8.5 IMBALANCE ENGINE (FAIR VALUE GAP / SMC STRATEGY)
+   ============================================================
+   Implements the second course's "one strategy for life" (SMC /
+   price-action) method: a three-candle Fair Value Gap ("imbalance")
+   combined with a Support/Resistance flip and an inner liquidity
+   sweep, confirmed by a market structure break, and aimed at a
+   clear target — equal highs/lows or the previous day's high/low
+   (PDH/PDL), which the course treats as "institutional levels."
+
+   Core quote encoded here: "support and resistance flips, multi
+   imbalance zones, and inner liquidity sweeps... keep looking for
+   the same setup every day."
+   ============================================================ */
+const ImbalanceEngine = {
+
+  // A bullish Fair Value Gap / imbalance: candle[i-1].high < candle[i+1].low
+  // (a gap the market left behind during an impulsive move up).
+  // A bearish imbalance: candle[i-1].low > candle[i+1].high.
+  findImbalances(candles){
+    const bullishGaps = [];
+    const bearishGaps = [];
+
+    for (let i = 1; i < candles.length - 1; i++){
+      const prev = candles[i - 1];
+      const next = candles[i + 1];
+
+      if (prev.high < next.low){
+        bullishGaps.push({ index: i, top: next.low, bottom: prev.high, time: candles[i].time });
+      }
+      if (prev.low > next.high){
+        bearishGaps.push({ index: i, top: prev.low, bottom: next.high, time: candles[i].time });
+      }
+    }
+
+    // Most recent gaps matter most — these are the "fuel"/"gas station"
+    // zones the course refers to for pullback entries.
+    return {
+      bullishGaps: bullishGaps.slice(-5),
+      bearishGaps: bearishGaps.slice(-5)
+    };
+  },
+
+  // Checks whether current price is tapping (inside or very near) any
+  // recent imbalance zone — the course's "imbalance tap" entry trigger.
+  priceTapsImbalance(currentPrice, gaps){
+    for (const g of gaps){
+      if (currentPrice <= g.top && currentPrice >= g.bottom) return true;
+    }
+    return false;
+  },
+
+  // Previous Day High / Low — the course's core institutional target.
+  // Approximates a "trading day" as the most recent ~24 hourly-equivalent
+  // candles available in the series (adapts to whatever timeframe is
+  // loaded, since intraday day boundaries aren't provided by the feed).
+  findPreviousDayLevels(candles, timeframe){
+    const barsPerDay = {
+      "5min": 288, "15min": 96, "30min": 48, "1h": 24, "4h": 6, "1day": 1
+    };
+    const perDay = barsPerDay[timeframe] || 24;
+    if (candles.length < perDay * 2) return { pdh: null, pdl: null };
+
+    const prevDaySlice = candles.slice(-(perDay * 2), -perDay);
+    if (prevDaySlice.length === 0) return { pdh: null, pdl: null };
+
+    const pdh = Math.max(...prevDaySlice.map(c => c.high));
+    const pdl = Math.min(...prevDaySlice.map(c => c.low));
+    return { pdh, pdl };
+  },
+
+  // Equal highs / equal lows: the course's other primary target type —
+  // liquidity pools where multiple swing points sit at nearly the same
+  // price, indicating a cluster of resting stop-losses.
+  findEqualLevels(swingHighs, swingLows, tolerancePct = 0.0006){
+    const equalHighs = [];
+    const equalLows = [];
+
+    for (let i = 1; i < swingHighs.length; i++){
+      const a = swingHighs[i - 1].price;
+      const b = swingHighs[i].price;
+      if (Math.abs(a - b) / a < tolerancePct){
+        equalHighs.push({ level: (a + b) / 2, count: 2 });
+      }
+    }
+    for (let i = 1; i < swingLows.length; i++){
+      const a = swingLows[i - 1].price;
+      const b = swingLows[i].price;
+      if (Math.abs(a - b) / a < tolerancePct){
+        equalLows.push({ level: (a + b) / 2, count: 2 });
+      }
+    }
+
+    return {
+      equalHighs: equalHighs.slice(-2),
+      equalLows: equalLows.slice(-2)
+    };
+  },
+
+  // Support/Resistance flip: a level that was resistance is broken and
+  // re-tested as support (bullish flip), or a support level is broken
+  // and re-tested as resistance (bearish flip). Uses the same
+  // support/resistance levels already computed by ZoneEngine.
+  detectSRFlip(candles, support, resistance, lookback = 15){
+    const recent = candles.slice(-lookback);
+    const currentPrice = candles[candles.length - 1].close;
+
+    let bullishFlip = false;
+    let bearishFlip = false;
+
+    // Bullish flip: price previously broke below support, and has now
+    // reclaimed back above it (old support acting as new... resistance
+    // being reclaimed — i.e. flipped to support on the retest).
+    const brokeBelowSupport = recent.some(c => c.close < support * 1.0005);
+    if (brokeBelowSupport && currentPrice > support){
+      bullishFlip = true;
+    }
+
+    // Bearish flip: price previously broke above resistance, and has
+    // now fallen back below it.
+    const brokeAboveResistance = recent.some(c => c.close > resistance * 0.9995);
+    if (brokeAboveResistance && currentPrice < resistance){
+      bearishFlip = true;
+    }
+
+    return { bullishFlip, bearishFlip };
+  }
+};
+
+/* ============================================================
+   9. CANDLESTICK PATTERN DETECTION
+   ============================================================ */
+const PatternEngine = {
+
+  detect(candles){
+    if (candles.length < 3) return { name: "NONE", bias: "NEUTRAL" };
+
+    const c0 = candles[candles.length - 1]; // most recent
+    const c1 = candles[candles.length - 2]; // previous
+
+    if (this.isBullishEngulfing(c1, c0)) return { name: "BULLISH ENGULFING", bias: "BULLISH" };
+    if (this.isBearishEngulfing(c1, c0)) return { name: "BEARISH ENGULFING", bias: "BEARISH" };
+    if (this.isHammer(c0)) return { name: "HAMMER", bias: "BULLISH" };
+    if (this.isShootingStar(c0)) return { name: "SHOOTING STAR", bias: "BEARISH" };
+    if (this.isDoji(c0)) return { name: "DOJI", bias: "NEUTRAL" };
+
+    return { name: "NONE", bias: "NEUTRAL" };
+  },
+
+  isBullishEngulfing(prev, curr){
+    return prev.close < prev.open &&
+           curr.close > curr.open &&
+           curr.close >= prev.open &&
+           curr.open <= prev.close;
+  },
+
+  isBearishEngulfing(prev, curr){
+    return prev.close > prev.open &&
+           curr.close < curr.open &&
+           curr.open >= prev.close &&
+           curr.close <= prev.open;
+  },
+
+  isHammer(c){
+    const body = Math.abs(c.close - c.open);
+    const range = c.high - c.low;
+    if (range === 0) return false;
+    const lowerWick = Math.min(c.open, c.close) - c.low;
+    const upperWick = c.high - Math.max(c.open, c.close);
+    return lowerWick > body * 2 && upperWick < body * 0.6 && body / range < 0.4;
+  },
+
+  isShootingStar(c){
+    const body = Math.abs(c.close - c.open);
+    const range = c.high - c.low;
+    if (range === 0) return false;
+    const upperWick = c.high - Math.max(c.open, c.close);
+    const lowerWick = Math.min(c.open, c.close) - c.low;
+    return upperWick > body * 2 && lowerWick < body * 0.6 && body / range < 0.4;
+  },
+
+  isDoji(c){
+    const body = Math.abs(c.close - c.open);
+    const range = c.high - c.low;
+    if (range === 0) return false;
+    return body / range < 0.1;
+  }
+};
+
+/* ============================================================
+   10. SIGNAL DECISION ENGINE
+   ============================================================
+   This engine implements the "S.L.C." framework taught across the
+   knowledge base (Video 16, reinforced by Videos 2, 6, 8, 9, 13, 19):
+
+     S — STRUCTURE   : Determine higher-timeframe trend. Only look
+                        for longs in an uptrend, shorts in a downtrend.
+                        Consolidation = no trade (Video 8, Video 16).
+     L — LEVEL       : Price must be sitting at a high-probability
+                        Supply or Demand level (Video 6, Video 16),
+                        not just "somewhere on the chart."
+     C — CONFIRMATION: Require a liquidity sweep and/or a rejection
+                        candle (engulfing / long wick) at that level
+                        before entering (Video 2, Video 13, Video 19).
+
+   If Structure, Level, and Confirmation don't all line up, the
+   engine returns NO TRADE — this mirrors the course's repeated
+   rule: "your strategy is less about telling you what to take and
+   more about telling you what NOT to take" (Video 19).
+
+   Indicators (EMA/RSI/MACD/ATR) are used as supporting confluence
+   and for volatility/stop-placement, exactly as taught in Video 6
+   (Tip 5), Video 10, and Video 17 — not as standalone signal
+   generators.
+   ============================================================ */
+const SignalEngine = {
+
+  analyze(candles){
+    const closes = candles.map(c => c.close);
+    const decimals = decimalsForPair(APP_STATE.pair);
+    const currentPrice = closes[closes.length - 1];
+
+    // --- Indicators (supporting confluence, per Video 6/10/17) ---
+    const ema20Series = Indicators.ema(closes, 20);
+    const ema50Series = Indicators.ema(closes, 50);
+    const rsiSeries = Indicators.rsi(closes, 14);
+    const macdData = Indicators.macd(closes, 12, 26, 9);
+    const atrSeries = Indicators.atr(candles, 14);
+
+    const ema20 = ema20Series[ema20Series.length - 1];
+    const ema50 = ema50Series[ema50Series.length - 1];
+    const rsi = rsiSeries[rsiSeries.length - 1];
+    const macdHist = macdData.histogram[macdData.histogram.length - 1];
+    const macdHistPrev = macdData.histogram[macdData.histogram.length - 2];
+    const atr = atrSeries[atrSeries.length - 1];
+
+    // --- Structure ---
+    const { swingHighs, swingLows } = StructureEngine.findSwings(candles, 2);
+    const classification = StructureEngine.classifySwingSequence(swingHighs, swingLows);
+    const trend = StructureEngine.determineTrend(classification);
+    const bos = StructureEngine.detectBOS(candles, swingHighs, swingLows);
+
+    // --- Zones & Liquidity ---
+    const { demandZones, supplyZones } = ZoneEngine.findSupplyDemandZones(candles, atrSeries);
+    const liquidity = ZoneEngine.detectLiquiditySweep(candles, swingHighs, swingLows);
+    const { support, resistance } = ZoneEngine.findSupportResistance(candles, 100);
+    const inDemandZone = ZoneEngine.priceRespectsZone(currentPrice, demandZones, "demand");
+    const inSupplyZone = ZoneEngine.priceRespectsZone(currentPrice, supplyZones, "supply");
+
+    // --- Imbalances (Fair Value Gaps) & SMC targets/confirmation ---
+    const { bullishGaps, bearishGaps } = ImbalanceEngine.findImbalances(candles);
+    const tapsbullishGap = ImbalanceEngine.priceTapsImbalance(currentPrice, bullishGaps);
+    const tapsBearishGap = ImbalanceEngine.priceTapsImbalance(currentPrice, bearishGaps);
+    const { pdh, pdl } = ImbalanceEngine.findPreviousDayLevels(candles, APP_STATE.timeframe);
+    const { equalHighs, equalLows } = ImbalanceEngine.findEqualLevels(swingHighs, swingLows);
+    const srFlip = ImbalanceEngine.detectSRFlip(candles, support, resistance);
+
+    // --- Candlestick pattern (rejection confirmation) ---
+    const pattern = PatternEngine.detect(candles);
+
+    const reasons = [];
+    const negatives = [];
+
+    // Volatility gate — reused for both structure validity and stop sizing.
+    const avgAtr = atrSeries.filter(v => v !== null).slice(-30).reduce((a,b) => a+b, 0) /
+                   Math.max(1, atrSeries.filter(v => v !== null).slice(-30).length);
+    const volatilityHealthy = atr && avgAtr && atr > avgAtr * 0.4;
+
+    /* ============================================================
+       STEP S — STRUCTURE
+       "In an uptrend, only look for long trades. In a downtrend,
+       only look for short trades. In consolidation, don't take
+       any trades." (Video 16 — SLC System / Video 8)
+       ============================================================ */
+    let structureOK = false;
+    let structureDirection = null;
+
+    if (trend === "BULLISH"){
+      structureOK = true;
+      structureDirection = "LONG";
+      reasons.push("STRUCTURE: Higher-timeframe trend is bullish (HH/HL) — only long setups are considered.");
+    } else if (trend === "BEARISH"){
+      structureOK = true;
+      structureDirection = "SHORT";
+      reasons.push("STRUCTURE: Higher-timeframe trend is bearish (LH/LL) — only short setups are considered.");
+    } else {
+      negatives.push("STRUCTURE: Market is in consolidation — the course rule is explicit: don't take any trades here.");
+    }
+
+    /* ============================================================
+       STEP L — LEVEL
+       "Mark high probability levels where price has the highest
+       chance of reacting" — Demand Level (before an aggressive move
+       up) or Supply Level (before an aggressive move down).
+       (Video 16 — SLC System / Video 6 — Tip 1)
+       ============================================================ */
+    let levelOK = false;
+
+    if (structureDirection === "LONG" && inDemandZone){
+      levelOK = true;
+      reasons.push("LEVEL: Price is sitting at a valid Demand Level (institutional buy origin) — a high-probability reaction zone.");
+    } else if (structureDirection === "SHORT" && inSupplyZone){
+      levelOK = true;
+      reasons.push("LEVEL: Price is sitting at a valid Supply Level (institutional sell origin) — a high-probability reaction zone.");
+    } else if (structureDirection){
+      negatives.push("LEVEL: Price is not currently at a mapped Supply/Demand level in the direction of the trend — no high-probability zone to trade from.");
+    }
+
+    /* ============================================================
+       STEP C — CONFIRMATION
+       "Look for long upper wick candles or bearish engulfing
+       candlesticks" (for sells); "long lower wick candles or
+       bullish engulfing candlesticks" (for buys) — Video 13.
+       Liquidity sweep adds further confirmation — Video 2/6/19.
+       ============================================================ */
+    let confirmationOK = false;
+    let liquidityConfirmed = false;
+    let patternConfirmed = false;
+
+    if (structureDirection === "LONG"){
+      if (liquidity.sweepLow){
+        liquidityConfirmed = true;
+        reasons.push("CONFIRMATION: Liquidity swept below a recent swing low, then rejected — stops were run before reversing up (Video 2/19).");
+      }
+      if (pattern.bias === "BULLISH"){
+        patternConfirmed = true;
+        reasons.push(`CONFIRMATION: ${pattern.name} confirms bullish rejection at this level (Video 13).`);
+      }
+    } else if (structureDirection === "SHORT"){
+      if (liquidity.sweepHigh){
+        liquidityConfirmed = true;
+        reasons.push("CONFIRMATION: Liquidity swept above a recent swing high, then rejected — stops were run before reversing down (Video 2/19).");
+      }
+      if (pattern.bias === "BEARISH"){
+        patternConfirmed = true;
+        reasons.push(`CONFIRMATION: ${pattern.name} confirms bearish rejection at this level (Video 13).`);
+      }
+    }
+
+    confirmationOK = liquidityConfirmed || patternConfirmed;
+    if (structureDirection && levelOK && !confirmationOK){
+      negatives.push("CONFIRMATION: No liquidity sweep or rejection candlestick at this level yet — the course says wait for confirmation before entering.");
+    }
+
+    /* ============================================================
+       SMC PATH — "ONE STRATEGY FOR LIFE" (second course)
+       An independent confirmation path: Structure break + Imbalance
+       tap + inner liquidity sweep + Support/Resistance flip, aimed
+       at a clear target (equal highs/lows or PDH/PDL). If this path
+       confirms, it can produce a signal even where the SLC path
+       above did not — mirroring how the course explicitly treats
+       this as its own complete, standalone method ("I only trade
+       using one strategy and that is pure price action").
+       ============================================================ */
+    let smcOK = false;
+    let smcTarget = null;
+
+    if (structureDirection === "LONG"){
+      const imbalanceOK = tapsbullishGap;
+      const srFlipOK = srFlip.bullishFlip;
+      const liquidityOK = liquidity.sweepLow;
+
+      if (imbalanceOK) reasons.push("SMC: Price is tapping a bullish imbalance (Fair Value Gap) — a pullback 'gas station' zone before continuation.");
+      if (srFlipOK) reasons.push("SMC: Support/Resistance flip confirmed — a broken level has been reclaimed as support.");
+      if (liquidityOK) reasons.push("SMC: Inner liquidity sweep detected below a recent low, adding confluence to the long idea.");
+
+      const smcConfluenceCount = [imbalanceOK, srFlipOK, liquidityOK].filter(Boolean).length;
+      smcOK = smcConfluenceCount >= 2;
+
+      if (equalHighs.length > 0){
+        smcTarget = equalHighs[equalHighs.length - 1].level;
+      } else if (pdh){
+        smcTarget = pdh;
+      }
+
+      if (smcOK && smcTarget){
+        reasons.push(`SMC TARGET: Clear target identified at ${fmt(smcTarget, decimals)} (equal highs / PDH) — the course requires a defined target, not just an entry.`);
+      } else if (structureDirection === "LONG" && !smcOK){
+        negatives.push("SMC: Fewer than 2 of (imbalance tap, SR flip, liquidity sweep) confirmed — 'one strategy for life' setup not yet valid.");
+      }
+    } else if (structureDirection === "SHORT"){
+      const imbalanceOK = tapsBearishGap;
+      const srFlipOK = srFlip.bearishFlip;
+      const liquidityOK = liquidity.sweepHigh;
+
+      if (imbalanceOK) reasons.push("SMC: Price is tapping a bearish imbalance (Fair Value Gap) — a pullback 'gas station' zone before continuation.");
+      if (srFlipOK) reasons.push("SMC: Support/Resistance flip confirmed — a broken level has been reclaimed as resistance.");
+      if (liquidityOK) reasons.push("SMC: Inner liquidity sweep detected above a recent high, adding confluence to the short idea.");
+
+      const smcConfluenceCount = [imbalanceOK, srFlipOK, liquidityOK].filter(Boolean).length;
+      smcOK = smcConfluenceCount >= 2;
+
+      if (equalLows.length > 0){
+        smcTarget = equalLows[equalLows.length - 1].level;
+      } else if (pdl){
+        smcTarget = pdl;
+      }
+
+      if (smcOK && smcTarget){
+        reasons.push(`SMC TARGET: Clear target identified at ${fmt(smcTarget, decimals)} (equal lows / PDL) — the course requires a defined target, not just an entry.`);
+      } else if (structureDirection === "SHORT" && !smcOK){
+        negatives.push("SMC: Fewer than 2 of (imbalance tap, SR flip, liquidity sweep) confirmed — 'one strategy for life' setup not yet valid.");
+      }
+    }
+
+    // The SMC path only counts as a valid alternate route if it also
+    // has a defined target — the course is explicit that an entry
+    // without a target is incomplete ("you also need a direction, a
+    // clear target").
+    smcOK = smcOK && !!smcTarget;
+
+    /* ============================================================
+       SUPPORTING CONFLUENCE (Video 6 Tip 5, Video 10, Video 17)
+       EMA/RSI/MACD do not generate the signal on their own — they
+       either add weight or serve as an invalidation warning.
+       ============================================================ */
+    let supportingScore = 0;
+
+    if (ema20 && ema50){
+      if (structureDirection === "LONG" && ema20 > ema50 && currentPrice > ema20){
+        supportingScore++;
+        reasons.push("EMA: Price above EMA20, which is above EMA50 — moving-average trend filter agrees with the long bias (Video 17).");
+      } else if (structureDirection === "SHORT" && ema20 < ema50 && currentPrice < ema20){
+        supportingScore++;
+        reasons.push("EMA: Price below EMA20, which is below EMA50 — moving-average trend filter agrees with the short bias (Video 17).");
+      } else if (structureDirection){
+        negatives.push("EMA: Price/EMA20/EMA50 are not cleanly aligned with the trend direction.");
+      }
+    }
+
+    if (rsi !== null){
+      if (structureDirection === "LONG" && rsi > 50 && rsi < 75){
+        supportingScore++;
+        reasons.push(`MOMENTUM: RSI(14) at ${fmt(rsi,1)} shows the buying party is currently in control (Video 6, Tip 5).`);
+      } else if (structureDirection === "SHORT" && rsi < 50 && rsi > 25){
+        supportingScore++;
+        reasons.push(`MOMENTUM: RSI(14) at ${fmt(rsi,1)} shows the selling party is currently in control (Video 6, Tip 5).`);
+      } else if (structureDirection === "LONG" && rsi >= 75){
+        negatives.push(`MOMENTUM: RSI(14) at ${fmt(rsi,1)} is overbought — momentum may be exhausted for a fresh long.`);
+      } else if (structureDirection === "SHORT" && rsi <= 25){
+        negatives.push(`MOMENTUM: RSI(14) at ${fmt(rsi,1)} is oversold — momentum may be exhausted for a fresh short.`);
+      }
+    }
+
+    if (macdHist !== null && macdHistPrev !== null){
+      if (structureDirection === "LONG" && macdHist > 0 && macdHist > macdHistPrev){
+        supportingScore++;
+        reasons.push("MOMENTUM: MACD histogram rising above zero — bullish momentum building.");
+      } else if (structureDirection === "SHORT" && macdHist < 0 && macdHist < macdHistPrev){
+        supportingScore++;
+        reasons.push("MOMENTUM: MACD histogram falling below zero — bearish momentum building.");
+      }
+    }
+
+    if (!volatilityHealthy){
+      negatives.push("VOLATILITY: ATR is compressed relative to its recent average — the course flags choppy, low-volatility conditions as low-probability (Video 10).");
+    }
+
+    /* ============================================================
+       FINAL DECISION
+       A signal fires if EITHER complete framework confirms:
+         - SLC (Structure + Level + Confirmation), or
+         - SMC "one strategy for life" (Structure + 2-of-3 imbalance/
+           SR-flip/liquidity confluence + a defined target)
+       Both require Structure to agree first — neither course allows
+       trading against the higher-timeframe trend. This mirrors two
+       independent, complete methods rather than blending their
+       internals together.
+       ============================================================ */
+    let signal = "NO TRADE";
+    let bias = "NEUTRAL";
+
+    const slcPassed = structureOK && levelOK && confirmationOK && volatilityHealthy;
+    const smcPassed = structureOK && smcOK && volatilityHealthy;
+    const anyPathPassed = slcPassed || smcPassed;
+
+    if (anyPathPassed && structureDirection === "LONG"){
+      signal = "BUY";
+      bias = "BULLISH";
+    } else if (anyPathPassed && structureDirection === "SHORT"){
+      signal = "SELL";
+      bias = "BEARISH";
+    } else {
+      signal = "NO TRADE";
+      bias = trend === "RANGING" ? "NEUTRAL" : trend;
+      if (structureOK && !levelOK && !smcOK){
+        negatives.push("SLC: Structure agrees but no valid Level — signal suppressed (Video 16).");
+      } else if (structureOK && levelOK && !confirmationOK && !smcOK){
+        negatives.push("SLC: Structure and Level agree but Confirmation is missing — signal suppressed until a sweep/rejection appears (Video 16).");
+      } else if (!structureOK){
+        negatives.push("STRUCTURE: No directional bias on either framework — signal suppressed.");
+      }
+    }
+
+    // --- Confidence ---
+    // Base confidence comes from how many of the three SLC gates passed
+    // (this is the core decision framework), with supporting indicator
+    // confluence (EMA/RSI/MACD) adding smaller increments on top —
+    // reflecting that the course treats those as secondary confirmation,
+    // not primary decision drivers. The SMC path, when it's the one that
+    // passed, contributes its own confluence count the same way.
+    let gatesPassed = 0;
+    if (structureOK) gatesPassed++;
+    if (levelOK) gatesPassed++;
+    if (confirmationOK) gatesPassed++;
+
+    let baseConfidence;
+    if (slcPassed){
+      baseConfidence = Math.round((gatesPassed / 3) * 70);
+    } else if (smcPassed){
+      baseConfidence = 60; // structure + 2-of-3 SMC confluences + defined target
+    } else {
+      baseConfidence = Math.round((gatesPassed / 3) * 70);
+    }
+
+    let confidence = baseConfidence + Math.min(supportingScore * 10, 30);
+    confidence = Math.max(0, Math.min(100, confidence));
+    if (signal === "NO TRADE") confidence = Math.min(confidence, 45);
+
+    // --- Trade levels (only meaningful if a signal is produced) ---
+    // Stop-loss placement follows Video 13 (beyond the confirmation
+    // candle) approximated here using ATR, since a live rejection
+    // candle's exact high/low is already reflected in current price
+    // action; take-profit enforces the course's non-negotiable 2R
+    // minimum (Video 2, Video 11, Video 13, Video 15) — unless the
+    // SMC path produced a specific target (equal highs/lows, PDH/PDL),
+    // in which case that level is used instead, per "you also need a
+    // clear target" from the second course.
+    let entry = null, stopLoss = null, takeProfit = null, riskReward = null;
+
+    if (signal === "BUY"){
+      entry = currentPrice;
+      const slDistance = atr ? atr * 1.5 : (currentPrice * 0.0025);
+      stopLoss = entry - slDistance;
+
+      if (smcPassed && smcTarget && smcTarget > entry){
+        takeProfit = smcTarget;
+        const actualRR = (takeProfit - entry) / (entry - stopLoss);
+        riskReward = `1 : ${actualRR.toFixed(1)}`;
+        reasons.push("RISK MANAGEMENT: Take-profit set at the identified SMC target (equal highs / PDH) rather than a fixed multiple.");
+      } else {
+        takeProfit = entry + slDistance * 2;
+        riskReward = "1 : 2.0";
+        reasons.push("RISK MANAGEMENT: Take-profit set at 2x stop distance — the course's non-negotiable minimum reward-to-risk (Video 2/11/13).");
+      }
+    } else if (signal === "SELL"){
+      entry = currentPrice;
+      const slDistance = atr ? atr * 1.5 : (currentPrice * 0.0025);
+      stopLoss = entry + slDistance;
+
+      if (smcPassed && smcTarget && smcTarget < entry){
+        takeProfit = smcTarget;
+        const actualRR = (entry - takeProfit) / (stopLoss - entry);
+        riskReward = `1 : ${actualRR.toFixed(1)}`;
+        reasons.push("RISK MANAGEMENT: Take-profit set at the identified SMC target (equal lows / PDL) rather than a fixed multiple.");
+      } else {
+        takeProfit = entry - slDistance * 2;
+        riskReward = "1 : 2.0";
+        reasons.push("RISK MANAGEMENT: Take-profit set at 2x stop distance — the course's non-negotiable minimum reward-to-risk (Video 2/11/13).");
+      }
+    }
+
+    return {
+      signal,
+      bias,
+      confidence,
+      trend,
+      bos,
+      entry, stopLoss, takeProfit, riskReward,
+      currentPrice,
+      support, resistance,
+      atr,
+      indicators: { ema20, ema50, rsi, macdHist },
+      reasons,
+      negatives,
+      pattern,
+      demandZones, supplyZones,
+      decimals,
+      slc: { structureOK, levelOK, confirmationOK, structureDirection },
+      smc: { smcOK, smcTarget, passed: smcPassed },
+      pdh, pdl, equalHighs, equalLows
+    };
+  }
+};
+
+/* ============================================================
+   11. CHART RENDERER (canvas candlesticks)
+   ============================================================ */
+function renderChart(candles){
+  const canvas = $("chartCanvas");
+  const ctx = canvas.getContext("2d");
+
+  const dpr = window.devicePixelRatio || 1;
+  const rect = canvas.getBoundingClientRect();
+  canvas.width = rect.width * dpr;
+  canvas.height = rect.height * dpr;
+  ctx.scale(dpr, dpr);
+
+  const w = rect.width;
+  const h = rect.height;
+  ctx.clearRect(0, 0, w, h);
+
+  const visible = candles.slice(-120);
+  if (visible.length === 0) return;
+
+  const highs = visible.map(c => c.high);
+  const lows = visible.map(c => c.low);
+  const maxPrice = Math.max(...highs);
+  const minPrice = Math.min(...lows);
+  const range = (maxPrice - minPrice) || 1;
+
+  const padding = 10;
+  const chartHeight = h - padding * 2;
+  const candleWidth = w / visible.length;
+
+  function yFor(price){
+    return padding + (1 - (price - minPrice) / range) * chartHeight;
+  }
+
+  visible.forEach((c, i) => {
+    const x = i * candleWidth + candleWidth / 2;
+    const isBull = c.close >= c.open;
+    ctx.strokeStyle = isBull ? "#00ff66" : "#ff3b3b";
+    ctx.fillStyle = isBull ? "#00ff66" : "#ff3b3b";
+
+    // Wick
+    ctx.beginPath();
+    ctx.moveTo(x, yFor(c.high));
+    ctx.lineTo(x, yFor(c.low));
+    ctx.lineWidth = 1;
+    ctx.stroke();
+
+    // Body
+    const bodyTop = yFor(Math.max(c.open, c.close));
+    const bodyBottom = yFor(Math.min(c.open, c.close));
+    const bodyHeight = Math.max(1, bodyBottom - bodyTop);
+    const bodyWidth = Math.max(1, candleWidth * 0.6);
+    ctx.fillRect(x - bodyWidth / 2, bodyTop, bodyWidth, bodyHeight);
+  });
+}
+
+/* ============================================================
+   12. UI BINDING / ORCHESTRATION
+   ============================================================ */
+
+// --- Timeframe button handling ---
+document.querySelectorAll(".tf-btn").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll(".tf-btn").forEach(b => b.classList.remove("active"));
+    btn.classList.add("active");
+    APP_STATE.timeframe = btn.dataset.tf;
+  });
+});
+
+// --- Pair selector ---
+$("pairSelect").addEventListener("change", (e) => {
+  APP_STATE.pair = e.target.value;
+  $("displayPair").textContent = APP_STATE.pair;
+});
+
+// --- API Key Modal ---
+$("apiKeySubmit").addEventListener("click", () => {
+  const key = $("apiKeyInput").value.trim();
+  if (!key){
+    $("apiKeyInput").style.borderColor = "var(--red)";
+    return;
+  }
+  APP_STATE.apiKey = key;
+  $("apiModal").style.display = "none";
+  $("apiDot").classList.remove("warn");
+  $("apiStatusText").textContent = "API: KEY SET";
+  queueConsoleLine("API key registered. Terminal ready.", "ok");
+});
+
+$("apiKeyInput").addEventListener("keydown", (e) => {
+  if (e.key === "Enter") $("apiKeySubmit").click();
+});
+
+// If a key has already been injected server-side, skip the modal.
+// (INSERT_TWELVE_DATA_API_KEY_HERE can be replaced at build time.)
+const INJECTED_API_KEY = "INSERT_TWELVE_DATA_API_KEY_HERE";
+if (INJECTED_API_KEY && INJECTED_API_KEY !== "INSERT_TWELVE_DATA_API_KEY_HERE"){
+  APP_STATE.apiKey = INJECTED_API_KEY;
+  $("apiModal").style.display = "none";
+  $("apiDot").classList.remove("warn");
+  $("apiStatusText").textContent = "API: KEY SET";
+}
+
+// --- Analyze button ---
+$("analyzeBtn").addEventListener("click", runAnalysis);
+
+async function runAnalysis(){
+  if (APP_STATE.isAnalyzing) return;
+
+  if (!APP_STATE.apiKey){
+    $("apiModal").style.display = "flex";
+    queueConsoleLine("ERROR: No API key configured.", "err");
+    return;
+  }
+
+  APP_STATE.isAnalyzing = true;
+  $("analyzeBtn").disabled = true;
+  $("signalValue").className = "signal-value idle";
+  $("signalValue").textContent = "ANALYZING...";
+  $("chartTag").textContent = "FETCHING";
+
+  const decimals = decimalsForPair(APP_STATE.pair);
+
+  try {
+    queueConsoleLine(`Initializing terminal for ${APP_STATE.pair} [${timeframeLabel(APP_STATE.timeframe)}]...`, "");
+    await delay(250);
+
+    queueConsoleLine("Connecting to Twelve Data market feed...", "");
+    await delay(250);
+
+    queueConsoleLine(`Downloading ${CANDLE_COUNT} candles...`, "");
+    const candles = await TwelveDataAPI.fetchCandles(APP_STATE.pair, APP_STATE.timeframe, CANDLE_COUNT);
+    APP_STATE.candles = candles;
+    queueConsoleLine(`Candle download complete. ${candles.length} candles received.`, "ok");
+    await delay(200);
+
+    queueConsoleLine("Calculating trend structure (HH/HL/LH/LL)...", "");
+    await delay(300);
+
+    queueConsoleLine("Detecting Break of Structure (BOS)...", "");
+    await delay(300);
+
+    queueConsoleLine("SLC STEP 1/3 — STRUCTURE: checking higher-timeframe trend direction...", "");
+    await delay(300);
+
+    queueConsoleLine("Mapping Supply Zones...", "");
+    await delay(260);
+
+    queueConsoleLine("Mapping Demand Zones...", "");
+    await delay(260);
+
+    queueConsoleLine("SLC STEP 2/3 — LEVEL: checking if price sits at a mapped Supply/Demand level...", "");
+    await delay(300);
+
+    queueConsoleLine("Scanning for liquidity sweeps...", "");
+    await delay(280);
+
+    queueConsoleLine("Scanning candlestick confirmation patterns...", "");
+    await delay(280);
+
+    queueConsoleLine("SLC STEP 3/3 — CONFIRMATION: checking for liquidity sweep or rejection candle...", "");
+    await delay(300);
+
+    queueConsoleLine("Scanning for Fair Value Gaps (imbalances)...", "");
+    await delay(260);
+
+    queueConsoleLine("Mapping previous day high/low and equal highs/lows...", "");
+    await delay(260);
+
+    queueConsoleLine("Checking for Support/Resistance flip...", "");
+    await delay(260);
+
+    queueConsoleLine("Computing EMA / RSI / MACD / ATR (supporting confluence)...", "");
+    await delay(280);
+
+    queueConsoleLine("Running dual decision engine (SLC path + SMC price-action path)...", "");
+    await delay(350);
+
+    const result = SignalEngine.analyze(candles);
+    APP_STATE.lastResult = result;
+
+    if (result.signal === "NO TRADE"){
+      queueConsoleLine("Insufficient confluence. Signal suppressed — NO TRADE.", "warn");
+    } else {
+      queueConsoleLine(`Signal generated: ${result.signal} (${result.confidence}% confidence).`, "ok");
+    }
+
+    renderResults(result, candles, decimals);
+    renderChart(candles);
+    $("chartTag").textContent = "LIVE";
+
+  } catch (err){
+    console.error(err);
+    queueConsoleLine(`ERROR: ${err.message}`, "err");
+    $("chartTag").textContent = "ERROR";
+    $("signalValue").className = "signal-value idle";
+    $("signalValue").textContent = "ERROR";
+  } finally {
+    APP_STATE.isAnalyzing = false;
+    $("analyzeBtn").disabled = false;
+  }
+}
+
+function timeframeLabel(tf){
+  const map = { "5min":"M5", "15min":"M15", "30min":"M30", "1h":"H1", "4h":"H4", "1day":"D1" };
+  return map[tf] || tf;
+}
+
+function delay(ms){
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+function renderResults(result, candles, decimals){
+  // Signal display
+  const sigEl = $("signalValue");
+  sigEl.textContent = result.signal;
+  sigEl.className = "signal-value " +
+    (result.signal === "BUY" ? "buy" : result.signal === "SELL" ? "sell" : "notrade");
+
+  $("confidenceText").textContent = result.confidence + "%";
+  $("confidenceBar").style.width = result.confidence + "%";
+
+  // Data rows
+  $("rowTrend").textContent = result.trend;
+  $("rowBias").textContent = result.bias;
+  $("rowSLC").textContent =
+    (result.slc.structureOK ? "S✔" : "S✘") + " " +
+    (result.slc.levelOK ? "L✔" : "L✘") + " " +
+    (result.slc.confirmationOK ? "C✔" : "C✘");
+  $("rowSMC").textContent = result.smc.passed
+    ? `VALID (target ${fmt(result.smc.smcTarget, decimals)})`
+    : (result.smc.smcOK ? "PARTIAL" : "NOT VALID");
+  $("rowEntry").textContent = result.entry !== null ? fmt(result.entry, decimals) : "--";
+  $("rowSL").textContent = result.stopLoss !== null ? fmt(result.stopLoss, decimals) : "--";
+  $("rowTP").textContent = result.takeProfit !== null ? fmt(result.takeProfit, decimals) : "--";
+  $("rowRR").textContent = result.riskReward || "--";
+
+  // Price strip
+  $("displayPrice").textContent = fmt(result.currentPrice, decimals);
+  $("metaHigh").textContent = fmt(result.resistance, decimals);
+  $("metaLow").textContent = fmt(result.support, decimals);
+  $("metaAtr").textContent = fmt(result.atr, decimals);
+  $("metaSpread").textContent = fmt(result.atr ? result.atr * 0.05 : null, decimals);
+
+  // Indicator boxes
+  $("indEma20").textContent = fmt(result.indicators.ema20, decimals);
+  $("indEma50").textContent = fmt(result.indicators.ema50, decimals);
+  $("indRsi").textContent = result.indicators.rsi !== null ? fmt(result.indicators.rsi, 1) : "--";
+  $("indMacd").textContent = result.indicators.macdHist !== null ? fmt(result.indicators.macdHist, 5) : "--";
+  $("indStructure").textContent = result.trend;
+
+  // Explanation / confluence log
+  const list = $("explanationList");
+  list.innerHTML = "";
+
+  if (result.reasons.length === 0 && result.negatives.length === 0){
+    const div = document.createElement("div");
+    div.className = "exp-item";
+    div.textContent = "No confluences detected.";
+    list.appendChild(div);
+  } else {
+    result.reasons.forEach(r => {
+      const div = document.createElement("div");
+      div.className = "exp-item";
+      div.textContent = "✔ " + r;
+      list.appendChild(div);
+    });
+    result.negatives.forEach(n => {
+      const div = document.createElement("div");
+      div.className = "exp-item neg";
+      div.textContent = "✘ " + n;
+      list.appendChild(div);
+    });
+  }
+
+  const finalLine = document.createElement("div");
+  finalLine.className = "exp-item";
+  finalLine.style.marginTop = "8px";
+  finalLine.style.fontWeight = "bold";
+  finalLine.textContent = `Signal: ${result.signal}`;
+  list.appendChild(finalLine);
+}
+
+/* ============================================================
+   BOOTSTRAP
+   ============================================================ */
+window.addEventListener("load", () => {
+  queueConsoleLine("Terminal booted. Awaiting API key and analysis request...", "");
+  $("displayPair").textContent = APP_STATE.pair;
+
+  if (!APP_STATE.apiKey){
+    $("apiModal").style.display = "flex";
+  }
+
+  window.addEventListener("resize", () => {
+    if (APP_STATE.candles.length) renderChart(APP_STATE.candles);
+  });
+});
+</script>
+
+</body>
+</html>
